@@ -1,288 +1,308 @@
-:root {
-  --primary: #2196f3;
-  --primary-rgb: 33, 150, 243;
-  --bg: #ffffff;
-  --text: #333333;
-  --surface: #f5f5f5;
-  --surface-rgb: 245, 245, 245;
-  --surface-2: #e0e0e0;
+class ClockApp {
+  constructor() {
+    this.currentMode = 'clock';
+    this.isRunning = false;
+    this.time = 0;
+    this.interval = null;
+    
+    this.initTheme();
+    this.initNavigation();
+    this.initClock();
+    this.renderControls();
+    
+    setInterval(() => this.updateClock(), 1000);
+  }
+
+  initTheme() {
+    const theme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const newTheme = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+    });
+  }
+
+  initNavigation() {
+    document.querySelectorAll('.nav button').forEach(button => {
+      button.addEventListener('click', () => {
+        if (button.dataset.mode === this.currentMode) return;
+        
+        const container = document.querySelector('.clock-container');
+        container.classList.add('switching');
+        
+        setTimeout(() => {
+          document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+          button.classList.add('active');
+          this.currentMode = button.dataset.mode;
+          this.stop();
+          this.time = 0;
+          this.clearClockDisplay();
+          this.renderControls();
+          
+          setTimeout(() => {
+            container.classList.remove('switching');
+          }, 300);
+        }, 300);
+      });
+    });
+  }
+
+  initClock() {
+    const numbers = document.querySelector('.numbers');
+    for (let i = 1; i <= 12; i++) {
+      const number = document.createElement('div');
+      number.className = 'number';
+      number.style.transform = `rotate(${i * 30}deg)`;
+      number.innerHTML = `<span style="transform: rotate(${-i * 30}deg)">${i}</span>`;
+      numbers.appendChild(number);
+    }
+  }
+
+  createScrollColumns() {
+    return `
+      <div class="scroll-digit">
+        <div class="scroll-column hours-tens">
+          ${Array.from({length: 3}, (_, i) => `<div>${i}</div>`).join('')}
+        </div>
+      </div>
+      <div class="scroll-digit">
+        <div class="scroll-column hours-ones">
+          ${Array.from({length: 10}, (_, i) => `<div>${i}</div>`).join('')}
+        </div>
+      </div>
+      <span class="divider">:</span>
+      <div class="scroll-digit">
+        <div class="scroll-column minutes-tens">
+          ${Array.from({length: 6}, (_, i) => `<div>${i}</div>`).join('')}
+        </div>
+      </div>
+      <div class="scroll-digit">
+        <div class="scroll-column minutes-ones">
+          ${Array.from({length: 10}, (_, i) => `<div>${i}</div>`).join('')}
+        </div>
+      </div>
+      <span class="divider">:</span>
+      <div class="scroll-digit">
+        <div class="scroll-column seconds-tens">
+          ${Array.from({length: 6}, (_, i) => `<div>${i}</div>`).join('')}
+        </div>
+      </div>
+      <div class="scroll-digit">
+        <div class="scroll-column seconds-ones">
+          ${Array.from({length: 10}, (_, i) => `<div>${i}</div>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  updateScrollColumn(type, value) {
+    const tens = Math.floor(value / 10);
+    const ones = value % 10;
+    
+    const tensColumn = document.querySelector(`.${type}-tens`);
+    const onesColumn = document.querySelector(`.${type}-ones`);
+    
+    if (tensColumn && onesColumn) {
+      const tensHeight = tensColumn.querySelector('div').offsetHeight;
+      const onesHeight = onesColumn.querySelector('div').offsetHeight;
+      
+      tensColumn.style.transform = `translateY(-${tens * tensHeight}px)`;
+      onesColumn.style.transform = `translateY(-${ones * onesHeight}px)`;
+    }
+  }
+
+  updateClock() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+
+    if (this.currentMode === 'clock') {
+      const digitalClock = document.querySelector('.digital-clock');
+      const analogClock = document.querySelector('.analog-clock');
+      
+      if (!digitalClock.querySelector('.scroll-digit')) {
+        digitalClock.innerHTML = this.createScrollColumns();
+      }
+
+      // Update digital clock
+      requestAnimationFrame(() => {
+        this.updateScrollColumn('hours', hours);
+        this.updateScrollColumn('minutes', minutes);
+        this.updateScrollColumn('seconds', seconds);
+      });
+
+      // Update analog clock
+      const hourDeg = ((hours % 12) * 3600 + minutes * 60 + seconds) * (360 / (12 * 3600));
+      const minuteDeg = (minutes * 60 + seconds) * (360 / (60 * 60));
+      const secondDeg = seconds * (360 / 60);
+
+      if (analogClock) {
+        analogClock.style.display = 'block';
+        requestAnimationFrame(() => {
+          document.querySelector('.hour').style.transform = `rotate(${hourDeg}deg)`;
+          document.querySelector('.minute').style.transform = `rotate(${minuteDeg}deg)`;
+          document.querySelector('.second').style.transform = `rotate(${secondDeg}deg)`;
+        });
+      }
+    }
+  }
+
+  updateAnalogDisplay() {
+    if (this.currentMode !== 'clock') {
+      const totalSeconds = this.time / 1000;
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      
+      const hourDeg = (hours % 12) * (360 / 12) + (minutes / 60) * (360 / 12);
+      const minuteDeg = minutes * (360 / 60) + (seconds / 60) * (360 / 60);
+      const secondDeg = seconds * (360 / 60);
+
+      requestAnimationFrame(() => {
+        document.querySelector('.hour').style.transform = `rotate(${hourDeg}deg)`;
+        document.querySelector('.minute').style.transform = `rotate(${minuteDeg}deg)`;
+        document.querySelector('.second').style.transform = `rotate(${secondDeg}deg)`;
+      });
+    }
+  }
+
+  start() {
+    if (this.isRunning) return;
+    this.isRunning = true;
+
+    if (this.currentMode === 'stopwatch') {
+      let lastTime = performance.now();
+      this.interval = setInterval(() => {
+        const currentTime = performance.now();
+        const delta = currentTime - lastTime;
+        lastTime = currentTime;
+        this.time += delta;
+        this.updateDisplay();
+        this.updateAnalogDisplay();
+      }, 16);
+    } else if (this.currentMode === 'timer') {
+      if (this.time <= 0) return;
+      let lastTime = performance.now();
+      this.interval = setInterval(() => {
+        const currentTime = performance.now();
+        const delta = currentTime - lastTime;
+        lastTime = currentTime;
+        this.time = Math.max(0, this.time - delta);
+        if (this.time <= 0) {
+          this.stop();
+          alert('Timer finished!');
+        }
+        this.updateDisplay();
+        this.updateAnalogDisplay();
+      }, 16);
+    }
+  }
+
+  stop() {
+    this.isRunning = false;
+    clearInterval(this.interval);
+  }
+
+  reset() {
+    this.stop();
+    this.time = 0;
+    this.updateDisplay();
+  }
+
+  updateDisplay() {
+    const digitalClock = document.querySelector('.digital-clock');
+    
+    if (this.currentMode === 'clock') {
+      this.updateClock();
+    } else {
+      if (!this.time && !this.isRunning) {
+        this.clearClockDisplay();
+      } else {
+        const milliseconds = String(Math.floor((this.time % 1000) / 10)).padStart(2, '0');
+        const seconds = String(Math.floor((this.time / 1000) % 60)).padStart(2, '0');
+        const minutes = String(Math.floor((this.time / 60000) % 60)).padStart(2, '0');
+        const hours = String(Math.floor(this.time / 3600000)).padStart(2, '0');
+
+        digitalClock.innerHTML = `
+          <span>${hours}</span>
+          <span class="divider">:</span>
+          <span>${minutes}</span>
+          <span class="divider">:</span>
+          <span>${seconds}</span>
+          ${this.currentMode === 'stopwatch' ? `<span class="milliseconds">.${milliseconds}</span>` : ''}
+        `;
+        
+        this.updateAnalogDisplay();
+      }
+    }
+  }
+
+  clearClockDisplay() {
+    const digitalClock = document.querySelector('.digital-clock');
+    const analogClock = document.querySelector('.analog-clock');
+    
+    if (this.currentMode !== 'clock') {
+      digitalClock.innerHTML = `
+        <span>00</span>
+        <span class="divider">:</span>
+        <span>00</span>
+        <span class="divider">:</span>
+        <span>00</span>
+        ${this.currentMode === 'stopwatch' ? '<span class="milliseconds">.00</span>' : ''}
+      `;
+      
+      // Reset analog clock to zero position
+      requestAnimationFrame(() => {
+        document.querySelector('.hour').style.transform = 'rotate(0deg)';
+        document.querySelector('.minute').style.transform = 'rotate(0deg)';
+        document.querySelector('.second').style.transform = 'rotate(0deg)';
+      });
+    }
+  }
+
+  renderControls() {
+    const controls = document.querySelector('.controls');
+    controls.innerHTML = '';
+
+    if (this.currentMode === 'stopwatch') {
+      controls.innerHTML = `
+        <button onclick="app.start()">Start</button>
+        <button onclick="app.stop()">Stop</button>
+        <button onclick="app.reset()">Reset</button>
+      `;
+    } else if (this.currentMode === 'timer') {
+      controls.innerHTML = `
+        <div class="timer-inputs">
+          <div class="timer-input-group">
+            <label>Hours</label>
+            <input type="number" class="timer-input" min="0" max="99" placeholder="HH" onchange="app.updateTimer()">
+          </div>
+          <div class="timer-input-group">
+            <label>Minutes</label>
+            <input type="number" class="timer-input" min="0" max="59" placeholder="MM" onchange="app.updateTimer()">
+          </div>
+          <div class="timer-input-group">
+            <label>Seconds</label>
+            <input type="number" class="timer-input" min="0" max="59" placeholder="SS" onchange="app.updateTimer()">
+          </div>
+        </div>
+        <button onclick="app.start()">Start</button>
+        <button onclick="app.stop()">Stop</button>
+        <button onclick="app.reset()">Reset</button>
+      `;
+    }
+  }
+
+  updateTimer() {
+    const inputs = document.querySelectorAll('.timer-input');
+    const [hours, minutes, seconds] = [...inputs].map(input => parseInt(input.value) || 0);
+    this.time = (hours * 3600 + minutes * 60 + seconds) * 1000;
+    this.updateDisplay();
+  }
 }
 
-[data-theme="dark"] {
-  --primary: #90caf9;
-  --primary-rgb: 144, 202, 249;
-  --bg: #121212;
-  --text: #ffffff;
-  --surface: #1e1e1e;
-  --surface-rgb: 30, 30, 30;
-  --surface-2: #2d2d2d;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.container {
-  width: 100%;
-  max-width: 800px;
-  padding: 2rem;
-}
-
-.nav {
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background: rgba(var(--surface-rgb), 0.8);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 2rem;
-  padding: 1rem;
-  border-radius: 12px;
-}
-
-.nav button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: none;
-  border: none;
-  color: var(--text);
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.nav button.active {
-  background: var(--primary);
-  color: white;
-}
-
-.nav button:hover {
-  background: rgba(var(--primary-rgb), 0.1);
-}
-
-.nav button svg {
-  width: 20px;
-  height: 20px;
-}
-
-.theme-toggle {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background: rgba(var(--surface-rgb), 0.8);
-  border: none;
-  padding: 0.5rem;
-  border-radius: 50%;
-  cursor: pointer;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.3s ease;
-}
-
-.theme-toggle:hover {
-  transform: rotate(30deg);
-}
-
-.clock-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2rem;
-  padding: 2rem;
-  background: rgba(var(--surface-rgb), 0.8);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.clock-container.switching {
-  transform: scale(0.95);
-  opacity: 0;
-}
-
-.digital-clock {
-  background: var(--surface);
-  padding: 1rem 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  font-size: 4rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.scroll-digit {
-  display: inline-flex;
-  position: relative;
-  width: 0.6em;
-  height: 1.2em;
-  overflow: hidden;
-  background: var(--surface);
-  border-radius: 8px;
-  margin: 0 0.1em;
-}
-
-.scroll-column {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  text-align: center;
-  transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.scroll-column div {
-  height: 1.2em;
-  line-height: 1.2em;
-  width: 100%;
-}
-
-.divider {
-  font-size: 4rem;
-  opacity: 0.7;
-  margin: 0 0.2em;
-  display: inline-block;
-  vertical-align: top;
-}
-
-.analog-clock {
-  width: 300px;
-  height: 300px;
-  border: 10px solid var(--primary);
-  border-radius: 50%;
-  position: relative;
-  background: var(--surface);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
-  display: none;
-}
-
-.analog-clock:hover {
-  transform: scale(1.05);
-}
-
-.hand {
-  position: absolute;
-  bottom: 50%;
-  left: 50%;
-  transform-origin: bottom;
-  background: var(--text);
-  border-radius: 4px;
-  transition: transform 0.5s cubic-bezier(0.4, 2.08, 0.55, 0.44);
-}
-
-.hour {
-  width: 4px;
-  height: 25%;
-}
-
-.minute {
-  width: 3px;
-  height: 35%;
-}
-
-.second {
-  width: 2px;
-  height: 40%;
-  background: var(--primary);
-  transition: transform 0.2s cubic-bezier(0.4, 2.08, 0.55, 0.44);
-}
-
-.number {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  text-align: center;
-  transform-origin: center;
-  font-weight: 500;
-}
-
-.controls {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.controls button {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.controls button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.timer-inputs {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.timer-input-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.timer-input-group label {
-  font-size: 0.8rem;
-  opacity: 0.7;
-  margin-bottom: 0.2rem;
-}
-
-.timer-input {
-  background: var(--surface);
-  color: var(--text);
-  border: 2px solid var(--primary);
-  padding: 0.5rem;
-  border-radius: 6px;
-  width: 4rem;
-  text-align: center;
-}
-
-.stopwatch-display,
-.timer-display {
-  font-size: 4rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.milliseconds {
-  font-size: 0.5em;
-  opacity: 0.7;
-}
+const app = new ClockApp();
